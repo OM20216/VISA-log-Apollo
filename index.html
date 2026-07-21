@@ -103,6 +103,13 @@
     <h1>VISA Shift Log</h1>
 
     <form id="shiftForm">
+      <label for="activity">Activity</label>
+      <select id="activity" required>
+        <option value="" disabled selected>Select activity</option>
+        <option value="1066">1066</option>
+        <option value="VISA">VISA</option>
+      </select>
+
       <label for="agentName">Agent Name</label>
       <select id="agentName" required>
         <option value="" disabled selected>Loading names...</option>
@@ -115,7 +122,7 @@
       <input type="time" id="logoutTime" required>
 
       <label for="dateField">Date</label>
-      <input type="text" id="dateField" readonly>
+      <input type="date" id="dateField" required>
 
       <button type="submit" id="submitBtn">Submit</button>
       <div class="status" id="statusMsg"></div>
@@ -155,14 +162,19 @@
   }
   loadAgents();
 
-  function todayIST(){
+  function dateParts(){
     const now = new Date();
-    const parts = new Intl.DateTimeFormat('en-GB', {
+    return new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Kolkata', day:'2-digit', month:'2-digit', year:'numeric'
     }).formatToParts(now).reduce((a,p)=>{a[p.type]=p.value; return a;}, {});
-    return `${parts.day}-${parts.month}-${parts.year}`;
   }
-  document.getElementById('dateField').value = todayIST();
+  // Native <input type="date"> requires yyyy-mm-dd — this also happens to be
+  // the unambiguous format Excel reliably recognizes as a real date.
+  function todayISO(){
+    const p = dateParts();
+    return `${p.year}-${p.month}-${p.day}`;
+  }
+  document.getElementById('dateField').value = todayISO();
 
   const form = document.getElementById('shiftForm');
   const statusMsg = document.getElementById('statusMsg');
@@ -175,6 +187,7 @@
     submitBtn.textContent = 'Submitting...';
 
     const payload = {
+      activity: document.getElementById('activity').value,
       agentName: document.getElementById('agentName').value,
       loginTime: document.getElementById('loginTime').value,
       logoutTime: document.getElementById('logoutTime').value,
@@ -191,7 +204,7 @@
       statusMsg.textContent = 'Submitted. Row added to VISA sheet.';
       statusMsg.className = 'status ok';
       form.reset();
-      document.getElementById('dateField').value = todayIST();
+      document.getElementById('dateField').value = todayISO();
     }catch(err){
       statusMsg.textContent = 'Submit failed — check connection and try again.';
       statusMsg.className = 'status err';
