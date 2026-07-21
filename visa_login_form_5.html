@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VISA Process — Shift Log</title>
+<style>
+  :root{
+    --ink:#1b2430;
+    --paper:#f6f7f5;
+    --line:#d8dce0;
+    --accent:#2f6f4f;
+    --accent-dark:#234f39;
+    --danger:#a4342a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:420px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:32px 28px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.06);
+  }
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--accent-dark);
+    font-weight:600;
+    margin-bottom:4px;
+  }
+  h1{
+    font-size:22px;
+    margin:0 0 22px 0;
+    font-weight:700;
+  }
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:6px;
+    margin-top:16px;
+    color:#3a4652;
+  }
+  select, input{
+    width:100%;
+    padding:10px 12px;
+    font-size:15px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    color:var(--ink);
+  }
+  select:focus, input:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+    border-color:var(--accent);
+  }
+  input[readonly]{
+    background:#eef1ee;
+    color:#5a6570;
+  }
+  button{
+    width:100%;
+    margin-top:24px;
+    padding:12px;
+    font-size:15px;
+    font-weight:600;
+    border:none;
+    border-radius:6px;
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+  }
+  button:hover{ background:var(--accent-dark); }
+  button:disabled{ background:#9aa5a0; cursor:not-allowed; }
+  .status{
+    margin-top:16px;
+    font-size:14px;
+    text-align:center;
+    display:none;
+  }
+  .status.ok{ color:var(--accent-dark); display:block; }
+  .status.err{ color:var(--danger); display:block; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="eyebrow">Apollo Process</div>
+    <h1>VISA Shift Log</h1>
+
+    <form id="shiftForm">
+      <label for="agentName">Agent Name</label>
+      <select id="agentName" required>
+        <option value="" disabled selected>Loading names...</option>
+      </select>
+
+      <label for="loginTime">Login Time</label>
+      <input type="time" id="loginTime" required>
+
+      <label for="logoutTime">Logout Time</label>
+      <input type="time" id="logoutTime" required>
+
+      <label for="dateField">Date</label>
+      <input type="text" id="dateField" readonly>
+
+      <button type="submit" id="submitBtn">Submit</button>
+      <div class="status" id="statusMsg"></div>
+    </form>
+  </div>
+
+<script>
+  // Replace with your "Add a row into a table" flow's HTTP trigger URL
+  const POWER_AUTOMATE_URL = "https://default6fb82fad19c741e5b5e1e7e1b02b03.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/f100341bb0b94e0b99bc9cf14bc3f929/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=CVePJuXc9mqBWyaZehRS1SrTRtG4lZnM6rZL3V0nIy0";
+  // Replace with your "Get Agent List" flow's HTTP trigger URL (GET)
+  const AGENT_LIST_URL = "https://default6fb82fad19c741e5b5e1e7e1b02b03.23.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/08/workflows/ffef724e7cfb4f57ae1011b16348f7b6/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2wOhRUK83VNkOGPtM_WcApjYZoIsLM1ZA0GsdxbqByo";
+
+  async function loadAgents(){
+    const select = document.getElementById('agentName');
+    try{
+      const res = await fetch(AGENT_LIST_URL, { method: 'POST' });
+      if(!res.ok) throw new Error('Failed to load list');
+      const data = await res.json();
+      // Expecting an array like [{"AgentName":"..."}] or ["..."]
+      const names = Array.isArray(data)
+        ? data.map(item => (typeof item === 'string' ? item : item['AGENT NAME']))
+        : [];
+      select.innerHTML = '<option value="" disabled selected>Select your name</option>';
+      names.forEach(name => {
+        if(!name) return;
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+      if(names.length === 0){
+        select.innerHTML = '<option value="" disabled selected>No names found</option>';
+      }
+    }catch(err){
+      select.innerHTML = '<option value="" disabled selected>Could not load names</option>';
+    }
+  }
+  loadAgents();
+
+  function dateParts(){
+    const now = new Date();
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata', day:'2-digit', month:'2-digit', year:'numeric'
+    }).formatToParts(now).reduce((a,p)=>{a[p.type]=p.value; return a;}, {});
+  }
+  // Shown to the agent (familiar format)
+  function todayIST(){
+    const p = dateParts();
+    return `${p.day}-${p.month}-${p.year}`;
+  }
+  // Sent to Excel (ISO, unambiguous so Excel stores it as a real date, not text)
+  function todayISO(){
+    const p = dateParts();
+    return `${p.year}-${p.month}-${p.day}`;
+  }
+  document.getElementById('dateField').value = todayIST();
+
+  const form = document.getElementById('shiftForm');
+  const statusMsg = document.getElementById('statusMsg');
+  const submitBtn = document.getElementById('submitBtn');
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    statusMsg.className = 'status';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    const payload = {
+      agentName: document.getElementById('agentName').value,
+      loginTime: document.getElementById('loginTime').value,
+      logoutTime: document.getElementById('logoutTime').value,
+      date: todayISO()
+    };
+
+    try{
+      const res = await fetch(POWER_AUTOMATE_URL, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok) throw new Error('Flow returned ' + res.status);
+      statusMsg.textContent = 'Submitted. Row added to VISA sheet.';
+      statusMsg.className = 'status ok';
+      form.reset();
+      document.getElementById('dateField').value = todayIST();
+    }catch(err){
+      statusMsg.textContent = 'Submit failed — check connection and try again.';
+      statusMsg.className = 'status err';
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit';
+    }
+  });
+</script>
+</body>
+</html>
