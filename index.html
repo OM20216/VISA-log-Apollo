@@ -155,21 +155,12 @@
   }
   loadAgents();
 
-  function dateParts(){
+  function todayIST(){
     const now = new Date();
-    return new Intl.DateTimeFormat('en-GB', {
+    const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Kolkata', day:'2-digit', month:'2-digit', year:'numeric'
     }).formatToParts(now).reduce((a,p)=>{a[p.type]=p.value; return a;}, {});
-  }
-  // Shown to the agent (familiar format)
-  function todayIST(){
-    const p = dateParts();
-    return `${p.day}-${p.month}-${p.year}`;
-  }
-  // Sent to Excel (ISO, unambiguous so Excel stores it as a real date, not text)
-  function todayISO(){
-    const p = dateParts();
-    return `${p.year}-${p.month}-${p.day}`;
+    return `${parts.day}-${parts.month}-${parts.year}`;
   }
   document.getElementById('dateField').value = todayIST();
 
@@ -187,7 +178,7 @@
       agentName: document.getElementById('agentName').value,
       loginTime: document.getElementById('loginTime').value,
       logoutTime: document.getElementById('logoutTime').value,
-      date: todayISO()
+      date: document.getElementById('dateField').value
     };
 
     try{
